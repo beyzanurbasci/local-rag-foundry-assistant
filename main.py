@@ -1,37 +1,34 @@
 from foundry_local_sdk import FoundryLocalManager, Configuration
-import time
 
-def main():
-    # 1. Sistemin başlatılması
-    config = Configuration(app_name="LocalRAGApp")
-    FoundryLocalManager.initialize(config=config)
-    manager = FoundryLocalManager.instance
-    
-    # Smollm veya Qwen 0.5B denemek daha güvenli
-    target_model_id = "smollm3-3b-generic-cpu:1"
-    
-    # Katalogdan modeli bul
-    target_model = next((m for m in manager.catalog.list_models() if m.id == target_model_id), None)
-    
-    # 2. İndirme kontrolü (Girintiler tam 4 boşluk)
+# 1. Initialize the configuration and the model manager
+config = Configuration(app_name="LocalRAGApp")
+manager = FoundryLocalManager(config=config)
+
+# 2. Access the model through the catalog using the alias
+target_model = manager.catalog.get_model("smollm3-3b")
+
+# 3. Check if the model exists before proceeding
+if target_model is None:
+    print("Error: Model 'smollm3-3b' not found in catalog.")
+else:
+    # 4. Download process: checking if it is cached locally
     if not target_model.is_cached:
-        print("Model indirme işlemi başlatıldı. Lütfen bekleyin...")
+        print("Model not found in cache. Download initiated, please wait...")
         target_model.download()
-        
-        while not target_model.is_cached:
-            print(".", end="", flush=True)
-            time.sleep(2)
-        print("\nİndirme başarıyla tamamlandı!")
+        print("Download completed successfully!")
     else:
-        print("Model zaten sistemde mevcut.")
+        print("Model already cached.")
 
-    # 3. Yükleme ve ChatClient
+    # 5. Loading and ChatClient initialization
+    print("Loading model into memory, please wait...")
     if not target_model.is_loaded:
         target_model.load()
-        
-    chat_client = target_model.get_chat_client()
-    response = chat_client.complete_chat(messages=[{"role": "user", "content": "Hello, world!"}])
-    print("\nModelin Cevabı:", response)
+    print("Model loaded! Fetching response...\n")
 
-if __name__ == "__main__":
-    main()
+    chat_client = target_model.get_chat_client()
+
+    # 6. Send message
+    response = chat_client.complete_chat(messages=[{"role": "user", "content": "Hello, world!"}])
+
+    # 7. Extract and print only the content
+    print("Model Response:", response.choices[0].message.content)
