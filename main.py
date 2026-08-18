@@ -6,52 +6,25 @@ from foundry_local_sdk import Configuration, FoundryLocalManager
 # Veritabanı dosya adı
 DB_NAME = "rag_database.db"
 
-# Hocanın Week 3 için istediği ham / uzun doküman havuzu
-# (İleride bunu bir dosyadan okutarak da yapabilirsin)
-raw_documents = [
-    (
-        "Foundry Local runs AI models directly on your device without cloud"
-        " connectivity. It ensures complete data privacy and low latency for"
-        " enterprise applications."
-    ),
-    (
-        "The Foundry Local SDK supports multiple programming languages including"
-        " Python, C#, JavaScript, and Rust. Developers can easily integrate"
-        " local models into their existing stacks."
-    ),
-    (
-        "Embedding models convert text into numerical vectors for similarity"
-        " search. This is the foundational step for building robust"
-        " Retrieval-Augmented Generation (RAG) systems."
-    ),
-    (
-        "Foundry Local uses ONNX Runtime for efficient model inference on"
-        " CPUs and GPUs. This maximizes hardware utilization on local"
-        " machines."
-    ),
-    (
-        "The model catalog provides pre-optimized models that you can download"
-        " and run locally. You can easily select models based on your"
-        " performance requirements."
-    ),
-    (
-        "Retrieval-augmented generation grounds model responses in your own"
-        " data, reducing hallucinations and providing accurate, context-aware"
-        " answers."
-    ),
-    (
-        "Vector similarity search finds documents that are semantically close"
-        " to a query by measuring the distance between their embedding vectors."
-    ),
-    (
-        "Chat completions generate natural language responses from a prompt and"
-        " context, allowing for conversational interactions with your data."
-    ),
-]
+
+def load_raw_documents_from_file(filename="knowledge.txt"):
+  """Hocanın istediği gibi: Bilgileri kodun içine yazmak yerine harici bir dosyadan (knowledge.txt) okur."""
+  try:
+    with open(filename, "r", encoding="utf-8") as f:
+      file_content = f.read()
+    # Paragraflara ayırarak ham doküman listesi oluşturuyoruz
+    raw_docs = [doc.strip() for doc in file_content.split("\n\n") if doc.strip()]
+    return raw_docs
+  except FileNotFoundError:
+    print(
+        f"⚠️ '{filename}' dosyası bulunamadı! Lütfen proje klasörüne bu"
+        " dosyayı oluşturun."
+    )
+    return []
 
 
 def chunk_text(text, max_chunk_size=300):
-  """Hocanın istediği: Uzun metinleri paragraf veya karakter sınırına göre küçük parçalara (chunks) ayırır."""
+  """Uzun metinleri paragraf veya karakter sınırına göre küçük parçalara (chunks) ayırır."""
   paragraphs = text.split("\n\n")
   chunks = []
 
@@ -108,9 +81,9 @@ def save_documents_to_db(docs, embeddings):
           (doc, json.dumps(emb)),
       )
     conn.commit()
-    print("Chunks and embeddings successfully saved to SQLite.")
+    print("✅ Chunks and embeddings successfully saved to SQLite.")
   else:
-    print("Documents already exist in SQLite database.")
+    print("ℹ️ Documents already exist in SQLite database.")
 
   conn.close()
 
@@ -154,7 +127,12 @@ def main():
   # 1. SQLite Veritabanını Başlat
   init_db()
 
-  # 2. Ham dokümanları otomatik olarak küçük parçalara (chunks) ayır
+  # 2. Harici dosyadan (knowledge.txt) ham dokümanları oku
+  raw_documents = load_raw_documents_from_file("knowledge.txt")
+  if not raw_documents:
+    return
+
+  # 3. Dokümanları otomatik olarak küçük parçalara (chunks) ayır
   all_chunks = []
   for raw_doc in raw_documents:
     chunks = chunk_text(raw_doc)
@@ -176,7 +154,7 @@ def main():
   embedding_model.load()
   embedding_client = embedding_model.get_embedding_client()
 
-  # 3. Embed all chunks (Eğer veritabanında yoksa üretip SQLite'a kaydediyoruz)
+  # 4. Embed all chunks (Eğer veritabanında yoksa üretip SQLite'a kaydediyoruz)
   docs, doc_embeddings = load_documents_from_db()
   if not docs:
     response = embedding_client.generate_embeddings(all_chunks)
