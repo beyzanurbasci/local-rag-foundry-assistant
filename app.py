@@ -58,7 +58,7 @@ def init_sdk_and_models():
   try:
     FoundryLocalManager.initialize(config)
   except Exception:
-    pass  # Singleton zaten başlatıldıysa hatayı yoksay
+    pass
 
   manager = FoundryLocalManager.instance
 
@@ -130,30 +130,31 @@ with st.sidebar:
   )
 
   if uploaded_pdf is not None:
-    pdf_text = extract_text_from_pdf(uploaded_pdf)
-    if pdf_text.strip():
-      chunks = [pdf_text[i : i + 500] for i in range(0, len(pdf_text), 400)]
+    # Aynı PDF'in tekrar tekrar eklenmesini önlemek için session kontrolü
+    if "last_uploaded_file" not in st.session_state or st.session_state.last_uploaded_file != uploaded_pdf.name:
+      pdf_text = extract_text_from_pdf(uploaded_pdf)
+      if pdf_text.strip():
+        chunks = [pdf_text[i : i + 500] for i in range(0, len(pdf_text), 400)]
 
-      conn = sqlite3.connect(DB_NAME, timeout=10.0)
-      cursor = conn.cursor()
-      for chunk in chunks:
-        if len(chunk.strip()) > 20:
-          emb_resp = embedding_client.generate_embedding(chunk)
-          chunk_emb = emb_resp.data[0].embedding
-          cursor.execute(
-              "INSERT INTO documents (content, embedding) VALUES (?, ?)",
-              (chunk, json.dumps(chunk_emb)),
-          )
-      conn.commit()
-      conn.close()
+        conn = sqlite3.connect(DB_NAME, timeout=10.0)
+        cursor = conn.cursor()
+        for chunk in chunks:
+          if len(chunk.strip()) > 20:
+            emb_resp = embedding_client.generate_embedding(chunk)
+            chunk_emb = emb_resp.data[0].embedding
+            cursor.execute(
+                "INSERT INTO documents (content, embedding) VALUES (?, ?)",
+                (chunk, json.dumps(chunk_emb)),
+            )
+        conn.commit()
+        conn.close()
 
-      st.cache_resource.clear()
-      st.success(
-          f"✨ PDF başarıyla yüklendi ve {len(chunks)} parça bilgi sisteme"
-          " eklendi! Lütfen sayfayı yenileyin."
-      )
-    else:
-      st.warning("⚠️ PDF dosyasından okunabilir metin çıkarılamadı.")
+        st.session_state.last_uploaded_file = uploaded_pdf.name
+        st.cache_resource.clear()
+        st.success(f"✨ PDF başarıyla yüklendi ({len(chunks)} parça eklendi)!")
+        st.rerun()
+      else:
+        st.warning("⚠️ PDF dosyasından okunabilir metin çıkarılamadı.")
 
   st.markdown("---")
   st.info(
