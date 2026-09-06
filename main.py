@@ -10,24 +10,21 @@ KNOWLEDGE_FILE = "knowledge.txt"
 
 
 def load_documents_from_file(filename=KNOWLEDGE_FILE):
-  """Hocanın istediği gibi: Verileri kod içine gömmek yerine harici bir belgeden (dosyadan) okur."""
   if not os.path.exists(filename):
     print(
-        f"⚠️ Uyarı: '{filename}' dosyası bulunamadı! Lütfen proje klasörüne bu"
+        f" Uyarı: '{filename}' dosyası bulunamadı! Lütfen proje klasörüne bu"
         " dosyayı ekleyin."
     )
     return []
-
   with open(filename, "r", encoding="utf-8") as f:
     file_content = f.read()
 
-  # Paragraflara ayırarak ham doküman listesi oluşturuyoruz
+  
   raw_docs = [doc.strip() for doc in file_content.split("\n\n") if doc.strip()]
   return raw_docs
 
 
 def chunk_text(text, max_chunk_size=300):
-  """Uzun dokümanları anlam bütünlüğünü bozmadan küçük parçalara (chunks) ayırır."""
   paragraphs = text.split("\n\n")
   chunks = []
 
@@ -55,7 +52,6 @@ def chunk_text(text, max_chunk_size=300):
 
 
 def init_db():
-  """SQLite veritabanını ve doküman tablosunu kurar."""
   conn = sqlite3.connect(DB_NAME)
   cursor = conn.cursor()
   cursor.execute("""
@@ -70,11 +66,10 @@ def init_db():
 
 
 def save_documents_to_db(docs, embeddings):
-  """Parçalanmış dokümanları ve embedding'lerini SQLite veritabanına kaydeder."""
   conn = sqlite3.connect(DB_NAME)
   cursor = conn.cursor()
 
-  # Veritabanı boşsa kayıt yap
+  
   cursor.execute("SELECT COUNT(*) FROM documents")
   count = cursor.fetchone()[0]
 
@@ -93,7 +88,6 @@ def save_documents_to_db(docs, embeddings):
 
 
 def load_documents_from_db():
-  """Veritabanındaki tüm chunk'ları ve embedding'leri belleğe yükler."""
   conn = sqlite3.connect(DB_NAME)
   cursor = conn.cursor()
   cursor.execute("SELECT content, embedding FROM documents")
@@ -110,7 +104,6 @@ def load_documents_from_db():
 
 
 def cosine_similarity(a, b):
-  """İki vektör arasındaki kosinüs benzerliğini hesaplar."""
   dot = sum(x * y for x, y in zip(a, b))
   norm_a = math.sqrt(sum(x * x for x in a))
   norm_b = math.sqrt(sum(x * x for x in b))
@@ -118,7 +111,6 @@ def cosine_similarity(a, b):
 
 
 def find_relevant(query_embedding, doc_embeddings, top_k=2):
-  """Sorgu vektörüne en yakın top-k doküman parçasını bulur."""
   scores = []
   for i, doc_emb in enumerate(doc_embeddings):
     score = cosine_similarity(query_embedding, doc_emb)
@@ -128,17 +120,15 @@ def find_relevant(query_embedding, doc_embeddings, top_k=2):
 
 
 def main():
-  # 1. SQLite Veritabanını Başlat
   init_db()
 
-  # 2. Harici belgeyi (knowledge.txt) sistem üzerinden oku
   print(f"📖 '{KNOWLEDGE_FILE}' belgesi okunuyor...")
   raw_documents = load_documents_from_file(KNOWLEDGE_FILE)
   if not raw_documents:
     print("❌ İşlem durduruldu: Geçerli bir doküman bulunamadı.")
     return
 
-  # 3. Metinleri otomatik olarak parçala (Chunking)
+  
   all_chunks = []
   for raw_doc in raw_documents:
     chunks = chunk_text(raw_doc)
@@ -146,12 +136,12 @@ def main():
 
   print(f"Toplam üretilen chunk sayısı: {len(all_chunks)}")
 
-  # 4. Foundry Local SDK ve Modelleri Başlat
+  
   config = Configuration(app_name="hotel_rag_assistant")
   FoundryLocalManager.initialize(config)
   manager = FoundryLocalManager.instance
 
-  # Embedding Modeli
+ 
   embedding_model = manager.catalog.get_model("qwen3-embedding-0.6b")
   embedding_model.download(
       lambda p: print(f"\rEmbedding modeli indiriliyor: {p:.1f}%", end="", flush=True)
@@ -160,7 +150,7 @@ def main():
   embedding_model.load()
   embedding_client = embedding_model.get_embedding_client()
 
-  # 5. Vektörleri üret ve SQLite'a kaydet (Eğer veritabanı boşsa)
+ 
   docs, doc_embeddings = load_documents_from_db()
   if not docs:
     print("🔄 Metinler vektörleştiriliyor...")
@@ -171,7 +161,7 @@ def main():
 
   print(f"SQLite veritabanından {len(doc_embeddings)} parça yüklendi.")
 
-  # Chat Modeli
+  
   chat_model = manager.catalog.get_model("qwen2.5-0.5b")
   chat_model.download(
       lambda p: print(f"\rChat modeli indiriliyor: {p:.1f}%", end="", flush=True)
@@ -186,21 +176,21 @@ def main():
   )
   print('Çıkış için "quit" yazabilirsiniz.\n')
 
-  # 6. İnteraktif Soru-Cevap Döngüsü
+  
   while True:
     query = input("Soru (Guest Question): ").strip()
     if not query or query.lower() == "quit":
       break
 
-    # Sorguyu vektöre dönüştür
+    
     query_response = embedding_client.generate_embedding(query)
     query_embedding = query_response.data[0].embedding
 
-    # En alakalı doküman parçalarını veritabanından bul
+    
     results = find_relevant(query_embedding, doc_embeddings, top_k=2)
     context = "\n".join(f"- {docs[i]}" for i, _ in results)
 
-    # Model için sistem kuralları ve bağlamı hazırla
+    
     messages = [
         {
             "role": "system",
@@ -216,7 +206,7 @@ def main():
         {"role": "user", "content": query},
     ]
 
-    # Yanıtı ekrana akıt (Streaming)
+    
     print("Assistant: ", end="", flush=True)
     for chunk in chat_client.complete_streaming_chat(messages):
       if hasattr(chunk, "choices") and chunk.choices:
@@ -225,7 +215,7 @@ def main():
           print(delta.content, end="", flush=True)
     print("\n" + "-" * 40 + "\n")
 
-  # Temizlik
+  
   embedding_model.unload()
   chat_model.unload()
   print("Modeller kapatıldı. İyi günler!")

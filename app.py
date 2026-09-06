@@ -7,7 +7,7 @@ from pypdf import PdfReader
 
 DB_NAME = "rag_database.db"
 
-# Streamlit Sayfa Yapılandırması
+
 st.set_page_config(
     page_title="Grand Horizon Hotel Assistant", page_icon="🏨", layout="centered"
 )
@@ -19,7 +19,7 @@ st.markdown(
 )
 
 
-# Veritabanı ve Modelleri Önbellekleme (Cache)
+
 @st.cache_resource
 def init_db():
   conn = sqlite3.connect(DB_NAME, timeout=10.0)
@@ -62,13 +62,13 @@ def init_sdk_and_models():
 
   manager = FoundryLocalManager.instance
 
-  # Embedding Modeli
+  
   emb_model = manager.catalog.get_model("qwen3-embedding-0.6b")
   emb_model.download(lambda p: None)
   emb_model.load()
   emb_client = emb_model.get_embedding_client()
 
-  # Chat Modeli
+  
   chat_model = manager.catalog.get_model("qwen2.5-0.5b")
   chat_model.download(lambda p: None)
   chat_model.load()
@@ -77,7 +77,7 @@ def init_sdk_and_models():
   return emb_client, chat_client
 
 
-# Kaynakları Yükle
+
 with st.spinner("🤖 Asistan hazırlanıyor, lütfen bekleyin..."):
   docs, doc_embeddings = load_db_data()
   embedding_client, chat_client = init_sdk_and_models()
@@ -90,7 +90,7 @@ def cosine_similarity(a, b):
   return dot / (norm_a * norm_b) if norm_a and norm_b else 0.0
 
 
-# Optimize Edilmiş Arama ve Eşik (Threshold) Filtresi
+
 def find_relevant(query_embedding, doc_embeddings, top_k=2, threshold=0.25):
   scores = []
   for i, doc_emb in enumerate(doc_embeddings):
@@ -101,7 +101,7 @@ def find_relevant(query_embedding, doc_embeddings, top_k=2, threshold=0.25):
   return scores[:top_k]
 
 
-# --- PDF İŞLEME YARDIMCISI ---
+
 def extract_text_from_pdf(uploaded_file):
   reader = PdfReader(uploaded_file)
   text = ""
@@ -112,11 +112,11 @@ def extract_text_from_pdf(uploaded_file):
   return text
 
 
-# Sohbet Hafızası Yönetimi
+
 if "messages" not in st.session_state:
   st.session_state.messages = []
 
-# Sidebar (Yan Menü) Kontrolleri ve Dosya Yükleme
+
 with st.sidebar:
   st.header("⚙️ Chat Control")
   if st.button("🗑️ Clear Conversation History"):
@@ -130,7 +130,7 @@ with st.sidebar:
   )
 
   if uploaded_pdf is not None:
-    # Aynı PDF'in tekrar tekrar eklenmesini önlemek için session kontrolü
+    
     if "last_uploaded_file" not in st.session_state or st.session_state.last_uploaded_file != uploaded_pdf.name:
       pdf_text = extract_text_from_pdf(uploaded_pdf)
       if pdf_text.strip():
@@ -162,18 +162,18 @@ with st.sidebar:
       " by Foundry Local SDK."
   )
 
-# Geçmiş Mesajları Ekranda Listele
+
 for message in st.session_state.messages:
   with st.chat_message(message["role"]):
     st.markdown(message["content"])
 
-# Kullanıcı Girdi Alanı
+
 if prompt := st.chat_input("How can I help you today?"):
   st.session_state.messages.append({"role": "user", "content": prompt})
   with st.chat_message("user"):
     st.markdown(prompt)
 
-  # Vektör Arama ve Optimize Edilmiş Context Filtrelemesi
+  
   query_response = embedding_client.generate_embedding(prompt)
   query_embedding = query_response.data[0].embedding
   results = find_relevant(
@@ -200,7 +200,7 @@ if prompt := st.chat_input("How can I help you today?"):
   for m in st.session_state.messages:
     messages.append({"role": m["role"], "content": m["content"]})
 
-  # Asistan Yanıtı (Streaming)
+  
   with st.chat_message("assistant"):
     response_container = st.empty()
     full_response = ""
