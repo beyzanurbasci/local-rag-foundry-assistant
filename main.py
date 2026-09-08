@@ -4,7 +4,7 @@ import os
 import sqlite3
 from foundry_local_sdk import Configuration, FoundryLocalManager
 
-# Veritabanı ve bilgi dosyası adları
+
 DB_NAME = "rag_database.db"
 KNOWLEDGE_FILE = "knowledge.txt"
 
